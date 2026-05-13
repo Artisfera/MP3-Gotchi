@@ -1,0 +1,10 @@
+Name,Purpose,Quantity,Total Cost (USD),Link,Distributor
+LoLin ESP32 Wemos Lite,"Main MCU board for the prototype. Compact ESP32 board with built-in DAC output, USB-C, and TP4054 LiPo charging onboard.",1,6.56,https://sklep.msalamon.pl/produkt/esp32-wemos-lite-4mb-flash-wifi-ble-4-2-li-ion-usb-c/,msalamon
+SSD1331 OLED Display 0.95 inch 96x64 SPI color,Small color OLED display for the MP3-Gotchi Tamagotchi-style user interface.,1,11.32,https://sklep.msalamon.pl/produkt/wyswietlacz-oled-095-spi-kolorowy/,msalamon
+Rotary encoder 15 mm,"Rotary control with push button for volume, menu navigation, and physical interaction.",1,1.39,https://sklep.msalamon.pl/produkt/enkoder-obrotowy-15-mm/,msalamon
+MicroSD reader SPI,SPI microSD reader for direct file access from the ESP32 instead of using a black-box MP3 module.,1,1.92,https://sklep.msalamon.pl/produkt/modul-czytnika-kart-micro-sd/,msalamon
+MPU6050 accelerometer and gyroscope,"Motion sensor for possible shake, tilt, gesture, or pet interaction features.",1,3.61,https://sklep.msalamon.pl/produkt/mpu6050-modul/,msalamon
+Mini vibration motor 12000 RPM,"Haptic feedback for UI actions, pet reactions, alerts, and game-like interaction.",2,3.72,https://sklep.msalamon.pl/produkt/mini-silnik-wibracyjny-12000-rpm/,msalamon
+LiPo battery,"Reused cell from a disposable vape, used as the first prototype battery.",1,0.00,,Reused / salvaged
+Wired earphones,"Reference earphones for testing ESP32 DAC audio quality, output coupling, noise, and real listening quality.",1,7.28,https://pl.aliexpress.com/item/1005006510076171.html,AliExpress
+InPost parcel locker shipping,Shipping cost for the main msalamon hardware order.,1,3.59,,InPost / msalamon
