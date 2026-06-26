@@ -1,0 +1,23 @@
+Required Notice: MP3-Gotchi by Patryk Ankudowicz (Artisfera), https://github.com/Artisfera/MP3-Gotchi
+
+Project license summary:
+
+- Firmware, helper scripts, and source code: PolyForm Noncommercial License 1.0.0.
+- Documentation, graphics, hardware files, models, schematics, videos, and media: Creative Commons Attribution-NonCommercial-ShareAlike 4.0 International, unless a file says otherwise.
+- Third-party material keeps its own license.
+
+Third-party notices:
+
+1. Aseprite Font
+   - Author: David Capello.
+   - Source: https://github.com/aseprite/aseprite/blob/main/data/fonts/LICENSE.txt
+   - License: Creative Commons Attribution 4.0 International.
+   - Use in this repository: `AsepriteMiniFontData.h` files are generated/adapted firmware bitmap data derived from the Aseprite Font asset supplied by the project author.
+   - Modification note: the original font was converted into compact C/C++ bitmap glyph data for MP3-Gotchi firmware rendering.
+
+2. CH341SER driver
+   - The CH341SER driver is not redistributed in this repository.
+   - Official WCH download page: https://www.wch-ic.com/downloads/CH341SER_EXE.html
+
+3. AAP-64 palette
+   - The AAP-64 palette file is not redistributed in this repository unless a clear redistribution license or permission is added later.

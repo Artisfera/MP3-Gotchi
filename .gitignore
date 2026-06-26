@@ -1,0 +1,27 @@
+.backup/
+.venv/
+.arduino-cli/
+.codex-tmp/
+.agents/
+
+# Local editor and OS junk
+.DS_Store
+Thumbs.db
+*.tmp
+*.bak
+
+# Python local artifacts
+__pycache__/
+*.py[cod]
+
+# Arduino build artifacts
+*.bin
+*.elf
+*.hex
+*.map
+*.partitions.bin
+*.merged.bin
+
+# Local SD-card staging folder. Keep the README only.
+firmware/tools/songs/*
+!firmware/tools/songs/README.md

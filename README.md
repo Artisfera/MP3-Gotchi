@@ -1,58 +1,100 @@
 # MP3-Gotchi
 
-A tiny Tamagotchi-style MP3 player built as a personal anniversary gift, and project on Hackaday Europe 2026.
+MP3-Gotchi is a tiny Tamagotchi-style offline MP3 player with a small monkey companion on a 96x64 color OLED.
 
-Have you ever been on a trip, lost signal, and ended up sitting in silence because streaming is gone and phone MP3 playback just does not feel the same? My girlfriend has that problem often, so I wanted to build her a small dedicated music player with a cute monkey pet living inside it.
+The project is built around an ESP32, SSD1331 OLED, rotary encoder, YX5300 MP3 module, MPU6050 motion sensor, and haptic motor. It is shared as a community-source, source-available, non-commercial hardware and firmware project.
 
-While listening to music, she will be able to feed and take care of the little monkey, unlock small interactions, and treat the player more like a pocket companion than a normal MP3 device.
+Current firmware release: `mp3gotchi-0.2.0`.
 
-This repository is the main project log. It includes the idea, hardware plan, BOM, build log, design decisions, and future updates.
+## Quick Start
 
-## Core idea
+Open the latest Arduino sketch here:
 
-MP3-Gotchi combines three things:
+```text
+firmware/src/mp3gotchi-0.2.0/mp3gotchi-0.2.0.ino
+```
 
-1. A real offline MP3 player.
-2. A Tamagotchi-style pet interface.
-3. A small handmade electronic gadget with a custom enclosure.
+User-facing firmware settings live in:
 
-The prototype is intentionally built from modules, but the goal is still to keep the design technically honest. The current version uses the built-in ESP32 DAC and a direct microSD connection instead of delegating playback to a black-box MP3 module. The sound will be tested with real wired earphones, because I need a consistent reference pair instead of judging the audio only through Bluetooth or old noisy earbuds.
+```text
+firmware/src/mp3gotchi-0.2.0/UserConfig.h
+```
 
-To make sure she never loses it, the final concept also includes an AirTag-style locator idea. The current plan is to explore an OpenHaystack-like BLE tracking approach or another small tracker solution inside the enclosure.
+Start there for messages, track count, YX5300 track offset, volume, brightness, encoder steps, shake thresholds, and custom emote timing.
 
-## Hardware BOM
+## Repository Layout
 
-Main order from msalamon was about $32.10 including InPost parcel locker shipping. Prices below are converted from PLN to USD using an approximate rate of 1 USD = 3.60 PLN, so small rounding differences are expected.
+```text
+firmware/assets/          Source sprite assets and sprite reference files.
+firmware/src/             Latest Arduino sketch only.
+firmware/reversions/      Historical firmware snapshots.
+firmware/tools/           Community helper scripts for SD cards, fonts, and emotes.
+firmware/user_emotes/     User workspace for custom emote layers.
+hardware/3dmodels/        Enclosure exports by version.
+hardware/drivers/         Driver download notes.
+hardware/schematics/      Prototype schematic exports.
+timelapses/               Prototype build videos and timelapse documentation.
+```
 
-| Component | Purpose | Quantity | Cost | Link |
-| --- | --- | ---: | ---: | --- |
-| LoLin ESP32 Wemos Lite | Main MCU board. Chosen because it is compact, has ESP32 DAC output, USB-C, and TP4054 LiPo charging onboard. | 1 | $6.56 | [Link](https://sklep.msalamon.pl/produkt/esp32-wemos-lite-4mb-flash-wifi-ble-4-2-li-ion-usb-c/) |
-| SSD1331 OLED Display | 0.95 inch 96x64 color SPI OLED for the Tamagotchi-style UI. | 1 | $11.32 | [Link](https://sklep.msalamon.pl/produkt/wyswietlacz-oled-095-spi-kolorowy/) |
-| Rotary encoder | 15 mm encoder with push button, used for volume and menu control. Planned with a custom 3D printed clack knob feel. | 1 | $1.39 | [Link](https://sklep.msalamon.pl/produkt/enkoder-obrotowy-15-mm/) |
-| MicroSD reader | SPI microSD reader for direct file access from ESP32. | 1 | $1.92 | [Link](https://sklep.msalamon.pl/produkt/modul-czytnika-kart-micro-sd/) |
-| MPU6050 accelerometer and gyroscope | Motion sensor for possible shake, tilt, gesture, or pet interaction features. | 1 | $3.61 | [Link](https://sklep.msalamon.pl/produkt/mpu6050-modul/) |
-| Mini vibration motor 12000 RPM | Haptic feedback for UI actions, pet reactions, alerts, or game-like interaction. | 2 | $3.72 | [Link](https://sklep.msalamon.pl/produkt/mini-silnik-wibracyjny-12000-rpm/) |
-| LiPo battery | Reused cell from a disposable vape. Used as the first prototype battery. | 1 | $0.00 |  |
-| Wired earphones | Reference earphones for testing the ESP32 DAC audio, output coupling, noise, and real listening quality. Included because I do not have a better wired reference pair besides Bluetooth audio and old noisy earbuds. | 1 | $7.28 | [Link](https://pl.aliexpress.com/item/1005006510076171.html) |
-| InPost shipping | Shipping cost for the main msalamon hardware order. | 1 | $3.59 |  |
-| **Total** | **Estimated full prototype cost, including the main hardware order, shipping, reused battery, and wired reference earphones.** |  | **$39.39** |  |
+## Firmware
 
-## Design decisions
+The latest firmware uses:
 
-### Why Wemos Lite?
+- YX5300 UART playback,
+- SSD1331 color OLED rendering,
+- rotary encoder click and rotation controls,
+- MPU6050 shake detection,
+- haptic feedback,
+- persistent ESP32 Preferences for track, volume, brightness, and shake settings,
+- generated sparse RGB565 custom emotes,
+- generated Aseprite Mini bitmap font data.
 
-The prototype uses a LoLin ESP32 Wemos Lite because it gives a compact ESP32 board with USB-C and onboard TP4054 charging. That helps a lot in a small hand-wired build, where adding a separate charger board would cost space and make the wiring messier.
+More firmware details are in `firmware/README.md` and the latest sketch README.
 
-### Why direct ESP32 audio?
+## Community Helpers
 
-The easy route would be to use a DFPlayer-style module, because it handles microSD, MP3 decoding, playback, and audio output as one black-box part.
+Prepare a YX5300 SD card in deterministic alphabetical copy order:
 
-I decided to remove it from the current BOM and use the ESP32 path instead. It is harder, but also more interesting and gives the main controller more ownership over the device. With direct microSD access, the ESP32 can control the file system and the player logic directly instead of only sending simple commands like play track 001 to an external module.
+```powershell
+python .\firmware\tools\prepare_yx5300_sd.py
+```
 
-The risk is audio quality. The ESP32 DAC is not a hi-fi audio codec, so the prototype needs real listening tests with wired earphones. If the audio is clearly unacceptable, the future version may move to a better audio solution, but the current build intentionally starts with the more ambitious direct approach.
+Build custom emotes from full-screen PNG layers:
 
-### Why a modular prototype?
+```powershell
+py .\firmware\tools\user_emotes\build_user_emotes.py
+```
 
-A proper final version should use a custom PCB. This build does not, because the deadline is too short. The modular version is faster to debug, easier to repair, and more realistic for a working event prototype.
+Regenerate the Aseprite Mini font header from a local `.otf` file:
 
-The goal is not to pretend this is production hardware. The goal is to build a working proof of concept that can later be redesigned into a cleaner PCB.
+```powershell
+python .\firmware\tools\generate_aseprite_mini_font.py --input C:\path\to\aseprite-mini.otf --output .\firmware\src\mp3gotchi-0.2.0\AsepriteMiniFontData.h --font-size 5
+```
+
+Local songs belong in `firmware/tools/songs/` while preparing an SD card. Real audio files are intentionally ignored by Git.
+
+## Local Folders
+
+`.git` is required by Git. It contains repository history, branches, and commit metadata. Do not delete it if you want commits to work.
+
+`.venv` is a local Python virtual environment for helper scripts. It is useful on your machine but should not be committed.
+
+`.backup` is local backup storage created during firmware work. It is ignored by Git.
+
+## License and Use
+
+MP3-Gotchi is shared for personal builds, learning, repair, modification, forks, and non-commercial community collaboration.
+
+Commercial use is not allowed without written permission from Patryk Ankudowicz (Artisfera).
+
+Because the project keeps a non-commercial restriction, it is not an OSI-approved open-source license. In public wording, prefer "community-source", "source-available", or "community-friendly non-commercial".
+
+Firmware, helper scripts, and source code use the PolyForm Noncommercial License 1.0.0. Documentation, graphics, hardware files, models, schematics, videos, and media use CC BY-NC-SA 4.0 unless a file says otherwise. Third-party material is listed in `NOTICE`.
+
+See `LICENSE` and `NON_COMMERCIAL_NOTICE.md`.
+
+## AI Disclosure
+
+Firmware and repository cleanup were prepared in collaboration with ChatGPT as a programming assistant.
+
+The project concept, hardware direction, creative decisions, and authorship belong to Patryk Ankudowicz (Artisfera).

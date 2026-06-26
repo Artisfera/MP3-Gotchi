@@ -1,0 +1,247 @@
+#include "MotionSensor.h"
+#include "PinMap.h"
+#include "ProjectConfig.h"
+#include "UserConfig.h"
+#include <math.h>
+
+bool MotionSensor::begin(uint8_t sdaPin, uint8_t sclPin, uint32_t frequency) {
+  found = false;
+  Wire.end();
+  delay(10);
+  Wire.begin(sdaPin, sclPin);
+  Wire.setClock(frequency);
+  hasAccelSample = false;
+  lastAccelTotalG = 1.0f;
+  shakeCandidateSamples = 0;
+  currentFrequency = frequency;
+
+  const uint8_t addresses[] = {0x68, 0x69};
+  for (uint8_t i = 0; i < sizeof(addresses); i++) {
+    InitStage failedStage = InitStage::Address;
+    uint8_t who = 0;
+    Serial.print("MPU6050 try SDA GPIO");
+    Serial.print(sdaPin);
+    Serial.print(", SCL GPIO");
+    Serial.print(sclPin);
+    Serial.print(", I2C ");
+    Serial.print(frequency);
+    Serial.print(", address 0x");
+    Serial.println(addresses[i], HEX);
+
+    if (beginAtAddress(addresses[i], failedStage, who)) {
+      found = true;
+      currentAddress = addresses[i];
+      currentWhoAmI = who;
+      Serial.print("MPU6050 OK address 0x");
+      Serial.print(currentAddress, HEX);
+      Serial.print(", WHO_AM_I 0x");
+      Serial.println(currentWhoAmI, HEX);
+      return true;
+    }
+
+    Serial.print("MPU6050 fail at ");
+    Serial.print(stageName(failedStage));
+    Serial.print(", WHO_AM_I 0x");
+    Serial.println(who, HEX);
+  }
+
+  return false;
+}
+
+bool MotionSensor::addressResponds(uint8_t address) {
+  Wire.beginTransmission(address);
+  return Wire.endTransmission() == 0;
+}
+
+bool MotionSensor::writeReg(uint8_t address, uint8_t reg, uint8_t value) {
+  Wire.beginTransmission(address);
+  Wire.write(reg);
+  Wire.write(value);
+  return Wire.endTransmission() == 0;
+}
+
+bool MotionSensor::readReg(uint8_t address, uint8_t reg, uint8_t& value) {
+  Wire.beginTransmission(address);
+  Wire.write(reg);
+  if (Wire.endTransmission(false) != 0) return false;
+  if (Wire.requestFrom(address, (uint8_t)1) != 1) return false;
+  value = Wire.read();
+  return true;
+}
+
+bool MotionSensor::readBytes(uint8_t address, uint8_t reg, uint8_t* buffer, size_t len) {
+  Wire.beginTransmission(address);
+  Wire.write(reg);
+  if (Wire.endTransmission(false) != 0) return false;
+  if ((size_t)Wire.requestFrom(address, (uint8_t)len) != len) return false;
+  for (size_t i = 0; i < len; i++) {
+    buffer[i] = Wire.read();
+  }
+  return true;
+}
+
+bool MotionSensor::readRawSample(uint8_t* raw, size_t len) {
+  if (!found || len < 14) return false;
+  return readBytes(currentAddress, 0x3B, raw, 14);
+}
+
+bool MotionSensor::beginAtAddress(uint8_t address, InitStage& failedStage, uint8_t& who) {
+  failedStage = InitStage::Address;
+  if (!addressResponds(address)) return false;
+
+  failedStage = InitStage::WhoAmI;
+  if (!readReg(address, 0x75, who)) return false;
+  if (who != 0x68 && who != 0x69) {
+    Serial.print("MPU6050 warning: WHO_AM_I is not typical: 0x");
+    Serial.println(who, HEX);
+  }
+
+  failedStage = InitStage::Wake;
+  if (!writeReg(address, 0x6B, 0x00)) return false;
+  delay(100);
+
+  writeReg(address, 0x1C, 0x00);
+  writeReg(address, 0x1B, 0x00);
+
+  failedStage = InitStage::ReadSample;
+  uint8_t raw[14] = {0};
+  if (!readBytes(address, 0x3B, raw, sizeof(raw))) return false;
+
+  failedStage = InitStage::Ok;
+  return true;
+}
+
+const char* MotionSensor::stageName(InitStage stage) {
+  switch (stage) {
+    case InitStage::Address: return "address ACK";
+    case InitStage::WhoAmI: return "WHO_AM_I";
+    case InitStage::Wake: return "wake write";
+    case InitStage::ReadSample: return "sample read";
+    case InitStage::Ok: return "ok";
+  }
+  return "unknown";
+}
+
+bool MotionSensor::update(const ShakeSettings& settings) {
+  if (!found) return false;
+  if (!settings.enabled) {
+    shakeCandidateSamples = 0;
+    return false;
+  }
+
+  uint8_t raw[14] = {0};
+  if (!readRawSample(raw, sizeof(raw))) return false;
+
+  int16_t axRaw = (int16_t)((raw[0] << 8) | raw[1]);
+  int16_t ayRaw = (int16_t)((raw[2] << 8) | raw[3]);
+  int16_t azRaw = (int16_t)((raw[4] << 8) | raw[5]);
+  int16_t gxRaw = (int16_t)((raw[8] << 8) | raw[9]);
+  int16_t gyRaw = (int16_t)((raw[10] << 8) | raw[11]);
+  int16_t gzRaw = (int16_t)((raw[12] << 8) | raw[13]);
+
+  constexpr float ACCEL_SCALE_2G = 16384.0f;
+  constexpr float GYRO_SCALE_250DPS = 131.0f;
+
+  float ax = (float)axRaw / ACCEL_SCALE_2G;
+  float ay = (float)ayRaw / ACCEL_SCALE_2G;
+  float az = (float)azRaw / ACCEL_SCALE_2G;
+  float gx = (float)gxRaw / GYRO_SCALE_250DPS;
+  float gy = (float)gyRaw / GYRO_SCALE_250DPS;
+  float gz = (float)gzRaw / GYRO_SCALE_250DPS;
+
+  float accelTotalG = sqrtf(
+    ax * ax +
+    ay * ay +
+    az * az
+  );
+
+  unsigned long now = millis();
+  float accelChangeG = hasAccelSample ? fabsf(accelTotalG - lastAccelTotalG) : 0.0f;
+  lastAccelTotalG = accelTotalG;
+  hasAccelSample = true;
+
+  if ((now - lastShakeMs) < settings.cooldownMs) {
+    shakeCandidateSamples = 0;
+    return false;
+  }
+
+  bool strongAccel =
+    fabsf(accelTotalG - 1.0f) >= settings.accelTotalG ||
+    accelChangeG >= settings.accelChangeG;
+  bool strongGyro =
+    fabsf(gx) >= settings.gyroDps ||
+    fabsf(gy) >= settings.gyroDps ||
+    fabsf(gz) >= settings.gyroDps;
+
+  if (!strongAccel && !strongGyro) {
+    shakeCandidateSamples = 0;
+    return false;
+  }
+
+  uint8_t requiredSamples = settings.confirmSamples;
+  if (requiredSamples < 1) requiredSamples = 1;
+  if (shakeCandidateSamples < requiredSamples) shakeCandidateSamples++;
+
+  if (shakeCandidateSamples >= requiredSamples) {
+    shakeCandidateSamples = 0;
+    lastShakeMs = now;
+    return true;
+  }
+
+  return false;
+}
+
+bool MotionSensor::printSample() {
+  if (!found) {
+    Serial.println("MPU6050 sample: sensor not initialized.");
+    return false;
+  }
+
+  uint8_t raw[14] = {0};
+  if (!readRawSample(raw, sizeof(raw))) {
+    Serial.println("MPU6050 sample read failed.");
+    return false;
+  }
+
+  int16_t axRaw = (int16_t)((raw[0] << 8) | raw[1]);
+  int16_t ayRaw = (int16_t)((raw[2] << 8) | raw[3]);
+  int16_t azRaw = (int16_t)((raw[4] << 8) | raw[5]);
+  int16_t tempRaw = (int16_t)((raw[6] << 8) | raw[7]);
+  int16_t gxRaw = (int16_t)((raw[8] << 8) | raw[9]);
+  int16_t gyRaw = (int16_t)((raw[10] << 8) | raw[11]);
+  int16_t gzRaw = (int16_t)((raw[12] << 8) | raw[13]);
+
+  constexpr float ACCEL_SCALE_2G = 16384.0f;
+  constexpr float GYRO_SCALE_250DPS = 131.0f;
+
+  float ax = (float)axRaw / ACCEL_SCALE_2G;
+  float ay = (float)ayRaw / ACCEL_SCALE_2G;
+  float az = (float)azRaw / ACCEL_SCALE_2G;
+  float gx = (float)gxRaw / GYRO_SCALE_250DPS;
+  float gy = (float)gyRaw / GYRO_SCALE_250DPS;
+  float gz = (float)gzRaw / GYRO_SCALE_250DPS;
+  float tempC = ((float)tempRaw / 340.0f) + 36.53f;
+  float accelTotalG = sqrtf(ax * ax + ay * ay + az * az);
+  float shakeScore = fabsf(accelTotalG - 1.0f);
+
+  Serial.print("ACC[g] X=");
+  Serial.print(ax, 3);
+  Serial.print(" Y=");
+  Serial.print(ay, 3);
+  Serial.print(" Z=");
+  Serial.print(az, 3);
+  Serial.print(" | GYRO[dps] X=");
+  Serial.print(gx, 1);
+  Serial.print(" Y=");
+  Serial.print(gy, 1);
+  Serial.print(" Z=");
+  Serial.print(gz, 1);
+  Serial.print(" | TEMP=");
+  Serial.print(tempC, 1);
+  Serial.print("C | totalG=");
+  Serial.print(accelTotalG, 3);
+  Serial.print(" | shake=");
+  Serial.print(shakeScore, 3);
+  Serial.println();
+  return true;
+}
